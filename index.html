@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Team Capacity Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f7fb;
+      --surface: #ffffff;
+      --surface-alt: #eef3fb;
+      --border: #d4ddea;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --accent: #2563eb;
+      --accent-dark: #1d4ed8;
+      --under: #e7f6ec;
+      --under-text: #1f6b3b;
+      --at: #fff6dd;
+      --at-text: #8a5a00;
+      --over: #fde8e8;
+      --over-text: #9f1d1d;
+      --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .page {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(1.8rem, 2vw, 2.4rem);
+    }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      padding: 20px;
+      margin-top: 20px;
+    }
+
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin-top: 20px;
+    }
+
+    .kpi {
+      background: linear-gradient(180deg, var(--surface), var(--surface-alt));
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+    }
+
+    .kpi-label {
+      display: block;
+      color: var(--muted);
+      font-size: 0.92rem;
+      margin-bottom: 8px;
+    }
+
+    .kpi-value {
+      font-size: 1.8rem;
+      font-weight: 700;
+    }
+
+    .toolbar,
+    .chart-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: end;
+    }
+
+    .toolbar {
+      justify-content: space-between;
+    }
+
+    .toolbar-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: end;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 160px;
+    }
+
+    .field label {
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    input,
+    select,
+    button,
+    textarea {
+      font: inherit;
+    }
+
+    input,
+    select {
+      min-height: 40px;
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 12px;
+      background: #fff;
+      color: var(--text);
+    }
+
+    button {
+      min-height: 40px;
+      border: none;
+      border-radius: 10px;
+      padding: 8px 14px;
+      cursor: pointer;
+      background: var(--accent);
+      color: #fff;
+      transition: background 0.15s ease-in-out;
+    }
+
+    button:hover,
+    button:focus-visible {
+      background: var(--accent-dark);
+    }
+
+    button.secondary {
+      background: #e5ecf9;
+      color: var(--text);
+    }
+
+    button.secondary:hover,
+    button.secondary:focus-visible {
+      background: #d7e3fa;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      margin-top: 16px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+    }
+
+    table {
+      width: 100%;
+      min-width: 1080px;
+      border-collapse: collapse;
+      background: var(--surface);
+    }
+
+    th,
+    td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f8fbff;
+      font-size: 0.95rem;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    th button {
+      width: 100%;
+      min-height: auto;
+      padding: 0;
+      border: none;
+      background: transparent;
+      color: inherit;
+      text-align: left;
+      font-weight: 700;
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    tbody tr.status-under {
+      background: var(--under);
+      color: var(--under-text);
+    }
+
+    tbody tr.status-at-capacity {
+      background: var(--at);
+      color: var(--at-text);
+    }
+
+    tbody tr.status-over {
+      background: var(--over);
+      color: var(--over-text);
+    }
+
+    td.editable {
+      cursor: pointer;
+      min-width: 120px;
+      position: relative;
+    }
+
+    td.editable:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: -2px;
+    }
+
+    .empty-value {
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    .cell-input {
+      width: 100%;
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      padding: 8px 10px;
+      min-height: 38px;
+      color: var(--text);
+    }
+
+    .cell-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .delete-btn {
+      background: #b91c1c;
+    }
+
+    .delete-btn:hover,
+    .delete-btn:focus-visible {
+      background: #991b1b;
+    }
+
+    .chart-container {
+      margin-top: 16px;
+      min-height: 380px;
+    }
+
+    .summary-note {
+      margin-top: 12px;
+      font-size: 0.92rem;
+      color: var(--muted);
+    }
+
+    @media (max-width: 768px) {
+      .page {
+        padding: 16px;
+      }
+
+      .panel {
+        padding: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header>
+      <h1>Team Retail Capacity</h1>
+      <p>Track weekly availability, allocations, and utilization with live KPIs, inline editing, and a synced hours utilized chart.</p>
+    </header>
+
+    <section class="kpis" aria-label="Capacity KPIs">
+      <article class="kpi">
+        <span class="kpi-label">Headcount</span>
+        <strong class="kpi-value" id="kpi-headcount">0</strong>
+      </article>
+      <article class="kpi">
+        <span class="kpi-label">Total available hours</span>
+        <strong class="kpi-value" id="kpi-available">0</strong>
+      </article>
+      <article class="kpi">
+        <span class="kpi-label">Total allocated hours</span>
+        <strong class="kpi-value" id="kpi-allocated">0</strong>
+      </article>
+      <article class="kpi">
+        <span class="kpi-label">Overall utilization</span>
+        <strong class="kpi-value" id="kpi-utilization">0%</strong>
+      </article>
+      <article class="kpi">
+        <span class="kpi-label">Over capacity</span>
+        <strong class="kpi-value" id="kpi-over">0</strong>
+      </article>
+    </section>
+
+    <section class="panel" aria-labelledby="table-section-title">
+      <div class="toolbar">
+        <div class="toolbar-group">
+          <div class="field">
+            <label for="search-input">Search people</label>
+            <input id="search-input" type="search" placeholder="Search name, role, or notes">
+          </div>
+          <div class="field">
+            <label for="team-filter">Filter by team</label>
+            <select id="team-filter">
+              <option value="">All teams</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="status-filter">Filter by status</label>
+            <select id="status-filter">
+              <option value="">All statuses</option>
+              <option value="Under">Under</option>
+              <option value="At capacity">At capacity</option>
+              <option value="Over">Over</option>
+            </select>
+          </div>
+        </div>
+        <div class="toolbar-group">
+          <button type="button" class="secondary" id="reset-filters-btn">Reset filters</button>
+          <button type="button" class="secondary" id="import-btn">Import CSV</button>
+          <button type="button" class="secondary" id="export-btn">Export CSV</button>
+          <button type="button" class="secondary" id="reset-data-btn">Reset to sample data</button>
+          <button type="button" id="add-row-btn">Add row</button>
+        </div>
+      </div>
+      <input id="csv-input" type="file" accept=".csv,text/csv" hidden>
+      <div class="table-wrap">
+        <table aria-describedby="table-section-title">
+          <thead>
+            <tr>
+              <th><button type="button" data-sort="name">Name <span data-indicator-for="name"></span></button></th>
+              <th><button type="button" data-sort="team">Team <span data-indicator-for="team"></span></button></th>
+              <th><button type="button" data-sort="role">Role <span data-indicator-for="role"></span></button></th>
+              <th><button type="button" data-sort="available">Available hours / week <span data-indicator-for="available"></span></button></th>
+              <th><button type="button" data-sort="allocated">Allocated hours / week <span data-indicator-for="allocated"></span></button></th>
+              <th><button type="button" data-sort="capacity">Capacity % <span data-indicator-for="capacity"></span></button></th>
+              <th><button type="button" data-sort="status">Status <span data-indicator-for="status"></span></button></th>
+              <th><button type="button" data-sort="notes">Notes <span data-indicator-for="notes"></span></button></th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="table-body"></tbody>
+        </table>
+      </div>
+      <p class="summary-note" id="table-section-title">Click or press Enter on editable cells to update values. Enter or blur saves; Escape cancels.</p>
+    </section>
+
+    <section class="panel" aria-labelledby="chart-title">
+      <div class="chart-toolbar">
+        <div>
+          <h2 id="chart-title" style="margin:0;">Hours utilized chart</h2>
+          <p>Chart stays in sync with the filtered table and reflects all edits immediately.</p>
+        </div>
+        <div class="field" style="margin-left:auto; min-width: 220px;">
+          <label for="chart-mode">Chart view</label>
+          <select id="chart-mode">
+            <option value="person">By person</option>
+            <option value="team">By team</option>
+          </select>
+        </div>
+      </div>
+      <div class="chart-container">
+        <canvas id="capacity-chart" aria-label="Bar chart showing available and allocated hours" role="img"></canvas>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const STORAGE_KEY = 'teamCapacityDashboardData';
+    const DEFAULT_SORT = { key: 'name', direction: 'asc' };
+    const SAMPLE_DATA = [
+      { id: createId(), name: 'Ava Patel', team: 'Merch', role: 'Buyer', available: 40, allocated: 34, notes: 'Seasonal planning' },
+      { id: createId(), name: 'Noah Kim', team: 'Ops', role: 'Fulfillment Lead', available: 40, allocated: 42, notes: 'Weekend launch support' },
+      { id: createId(), name: 'Liam Chen', team: 'Digital', role: 'E-commerce Manager', available: 40, allocated: 31, notes: 'Homepage refresh' },
+      { id: createId(), name: 'Emma Johnson', team: 'Store Ops', role: 'Regional Manager', available: 38, allocated: 30, notes: 'Travel week' },
+      { id: createId(), name: 'Sophia Davis', team: 'Merch', role: 'Planner', available: 40, allocated: 39, notes: 'Promo forecasting' },
+      { id: createId(), name: 'Mason Brooks', team: 'Ops', role: 'Inventory Analyst', available: 40, allocated: 28, notes: 'Cycle counts' },
+      { id: createId(), name: 'Isabella Reed', team: 'Digital', role: 'CRM Specialist', available: 36, allocated: 37, notes: 'Campaign QA' },
+      { id: createId(), name: 'Ethan Miller', team: 'Store Ops', role: 'Training Manager', available: 40, allocated: 24, notes: 'New store onboarding' },
+      { id: createId(), name: 'Mia Torres', team: 'Merch', role: 'Category Analyst', available: 40, allocated: 18, notes: '' },
+      { id: createId(), name: 'Lucas Green', team: 'Digital', role: 'Content Lead', available: 32, allocated: 27, notes: 'PDP clean-up' }
+    ];
+
+    const state = {
+      rows: loadRows(),
+      filters: { search: '', team: '', status: '' },
+      sort: { ...DEFAULT_SORT },
+      editing: null,
+      chartMode: 'person'
+    };
+
+    const elements = {
+      tableBody: document.getElementById('table-body'),
+      searchInput: document.getElementById('search-input'),
+      teamFilter: document.getElementById('team-filter'),
+      statusFilter: document.getElementById('status-filter'),
+      chartMode: document.getElementById('chart-mode'),
+      csvInput: document.getElementById('csv-input'),
+      indicators: document.querySelectorAll('[data-indicator-for]'),
+      kpis: {
+        headcount: document.getElementById('kpi-headcount'),
+        available: document.getElementById('kpi-available'),
+        allocated: document.getElementById('kpi-allocated'),
+        utilization: document.getElementById('kpi-utilization'),
+        over: document.getElementById('kpi-over')
+      }
+    };
+
+    const editableColumns = {
+      name: { label: 'Name', type: 'text', required: true },
+      team: { label: 'Team', type: 'text', required: true },
+      role: { label: 'Role', type: 'text', required: true },
+      available: { label: 'Available hours / week', type: 'number', required: true },
+      allocated: { label: 'Allocated hours / week', type: 'number', required: true },
+      notes: { label: 'Notes', type: 'text', required: false }
+    };
+
+    const chart = new Chart(document.getElementById('capacity-chart'), {
+      type: 'bar',
+      data: { labels: [], datasets: [] },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            beginAtZero: true,
+            title: { display: true, text: 'Hours' }
+          }
+        },
+        plugins: {
+          legend: { position: 'top' },
+          tooltip: {
+            callbacks: {
+              afterBody(context) {
+                const point = context[0] && context[0].raw;
+                if (!point || typeof point.utilization !== 'number') {
+                  return '';
+                }
+                return `Utilization: ${formatPercent(point.utilization)}`;
+              }
+            }
+          }
+        }
+      }
+    });
+
+    bindEvents();
+    render();
+
+    function bindEvents() {
+      elements.searchInput.addEventListener('input', (event) => {
+        state.filters.search = event.target.value;
+        render();
+      });
+
+      elements.teamFilter.addEventListener('change', (event) => {
+        state.filters.team = event.target.value;
+        render();
+      });
+
+      elements.statusFilter.addEventListener('change', (event) => {
+        state.filters.status = event.target.value;
+        render();
+      });
+
+      elements.chartMode.addEventListener('change', (event) => {
+        state.chartMode = event.target.value;
+        updateChart(getVisibleRows());
+      });
+
+      document.getElementById('reset-filters-btn').addEventListener('click', () => {
+        state.filters = { search: '', team: '', status: '' };
+        state.sort = { ...DEFAULT_SORT };
+        elements.searchInput.value = '';
+        elements.teamFilter.value = '';
+        elements.statusFilter.value = '';
+        render();
+      });
+
+      document.getElementById('add-row-btn').addEventListener('click', () => {
+        state.rows.push({
+          id: createId(),
+          name: 'New team member',
+          team: 'Unassigned',
+          role: 'New role',
+          available: 40,
+          allocated: 0,
+          notes: ''
+        });
+        persistRows();
+        render();
+      });
+
+      document.getElementById('reset-data-btn').addEventListener('click', () => {
+        state.rows = cloneSampleData();
+        state.filters = { search: '', team: '', status: '' };
+        state.sort = { ...DEFAULT_SORT };
+        elements.searchInput.value = '';
+        elements.teamFilter.value = '';
+        elements.statusFilter.value = '';
+        persistRows();
+        render();
+      });
+
+      document.getElementById('export-btn').addEventListener('click', exportCsv);
+      document.getElementById('import-btn').addEventListener('click', () => elements.csvInput.click());
+      elements.csvInput.addEventListener('change', handleImportCsv);
+
+      document.querySelectorAll('[data-sort]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const key = button.dataset.sort;
+          if (state.sort.key === key) {
+            state.sort.direction = state.sort.direction === 'asc' ? 'desc' : 'asc';
+          } else {
+            state.sort = { key, direction: 'asc' };
+          }
+          render();
+        });
+      });
+    }
+
+    function render() {
+      populateTeamFilter();
+      const visibleRows = getVisibleRows();
+      renderTable(visibleRows);
+      updateKpis(visibleRows);
+      updateSortIndicators();
+      updateChart(visibleRows);
+    }
+
+    function populateTeamFilter() {
+      const current = state.filters.team;
+      const teams = [...new Set(state.rows.map((row) => row.team).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+      elements.teamFilter.innerHTML = '<option value="">All teams</option>' + teams.map((team) => `<option value="${escapeHtml(team)}">${escapeHtml(team)}</option>`).join('');
+      elements.teamFilter.value = teams.includes(current) ? current : '';
+      if (!teams.includes(current)) {
+        state.filters.team = '';
+      }
+    }
+
+    function getVisibleRows() {
+      const normalizedSearch = state.filters.search.trim().toLowerCase();
+      return [...state.rows]
+        .filter((row) => {
+          const metrics = calculateMetrics(row);
+          const matchesSearch = !normalizedSearch || [row.name, row.role, row.notes]
+            .filter(Boolean)
+            .some((value) => value.toLowerCase().includes(normalizedSearch));
+          const matchesTeam = !state.filters.team || row.team === state.filters.team;
+          const matchesStatus = !state.filters.status || metrics.status === state.filters.status;
+          return matchesSearch && matchesTeam && matchesStatus;
+        })
+        .sort((left, right) => compareRows(left, right, state.sort.key, state.sort.direction));
+    }
+
+    function renderTable(rows) {
+      if (!rows.length) {
+        elements.tableBody.innerHTML = '<tr><td colspan="9">No matching team members found.</td></tr>';
+        return;
+      }
+
+      elements.tableBody.innerHTML = rows.map((row) => {
+        const metrics = calculateMetrics(row);
+        const statusClass = `status-${metrics.status.toLowerCase().replace(/\s+/g, '-')}`;
+        return `
+          <tr class="${statusClass}">
+            ${renderEditableCell(row, 'name')}
+            ${renderEditableCell(row, 'team')}
+            ${renderEditableCell(row, 'role')}
+            ${renderEditableCell(row, 'available')}
+            ${renderEditableCell(row, 'allocated')}
+            <td>${formatPercent(metrics.capacity)}</td>
+            <td>${metrics.status}</td>
+            ${renderEditableCell(row, 'notes')}
+            <td>
+              <div class="cell-actions">
+                <button type="button" class="delete-btn" data-delete-id="${row.id}">Delete</button>
+              </div>
+            </td>
+          </tr>`;
+      }).join('');
+
+      elements.tableBody.querySelectorAll('[data-edit-id]').forEach((cell) => {
+        cell.addEventListener('click', () => startEditing(cell.dataset.editId, cell.dataset.field));
+        cell.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            startEditing(cell.dataset.editId, cell.dataset.field);
+          }
+        });
+      });
+
+      elements.tableBody.querySelectorAll('[data-delete-id]').forEach((button) => {
+        button.addEventListener('click', () => {
+          state.rows = state.rows.filter((row) => row.id !== button.dataset.deleteId);
+          persistRows();
+          render();
+        });
+      });
+    }
+
+    function renderEditableCell(row, field) {
+      const value = row[field];
+      const isEditing = state.editing && state.editing.id === row.id && state.editing.field === field;
+      if (isEditing) {
+        const column = editableColumns[field];
+        const isNumber = column.type === 'number';
+        const safeValue = isNumber ? value : escapeHtml(String(value || ''));
+        return `<td class="editable">
+          <input
+            class="cell-input"
+            data-editor-id="${row.id}"
+            data-editor-field="${field}"
+            aria-label="Edit ${column.label} for ${escapeHtml(row.name || 'team member')}"
+            type="${isNumber ? 'number' : 'text'}"
+            ${isNumber ? 'min="0" step="0.1"' : ''}
+            value="${safeValue}">
+        </td>`;
+      }
+
+      const displayValue = value === '' ? '<span class="empty-value">Click to edit</span>' : escapeHtml(String(value));
+      return `<td class="editable" tabindex="0" role="button" aria-label="Edit ${editableColumns[field].label}" data-edit-id="${row.id}" data-field="${field}">${displayValue}</td>`;
+    }
+
+    function startEditing(id, field) {
+      state.editing = { id, field };
+      render();
+      const input = elements.tableBody.querySelector(`[data-editor-id="${CSS.escape(id)}"][data-editor-field="${field}"]`);
+      if (!input) {
+        return;
+      }
+      const originalValue = input.value;
+      input.focus();
+      input.select();
+      const cancel = () => {
+        state.editing = null;
+        render();
+      };
+      const commit = () => {
+        const row = state.rows.find((item) => item.id === id);
+        if (!row) {
+          cancel();
+          return;
+        }
+
+        const result = normalizeCellValue(field, input.value);
+        if (!result.valid) {
+          input.setCustomValidity(result.message);
+          input.reportValidity();
+          input.focus();
+          return;
+        }
+
+        row[field] = result.value;
+        state.editing = null;
+        persistRows();
+        render();
+      };
+
+      input.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          commit();
+        }
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          input.value = originalValue;
+          cancel();
+        }
+      });
+
+      input.addEventListener('input', () => input.setCustomValidity(''));
+      input.addEventListener('blur', commit);
+    }
+
+    function normalizeCellValue(field, rawValue) {
+      const column = editableColumns[field];
+      const value = column.type === 'number' ? Number(rawValue) : rawValue.trim();
+      if (column.required && (column.type === 'number' ? (rawValue === '' || Number.isNaN(value)) : value === '')) {
+        return { valid: false, message: `${column.label} is required.` };
+      }
+      if (column.type === 'number') {
+        if (!Number.isFinite(value) || value < 0) {
+          return { valid: false, message: `${column.label} must be a number greater than or equal to 0.` };
+        }
+        return { valid: true, value };
+      }
+      return { valid: true, value };
+    }
+
+    function updateKpis(rows) {
+      const available = rows.reduce((sum, row) => sum + Number(row.available || 0), 0);
+      const allocated = rows.reduce((sum, row) => sum + Number(row.allocated || 0), 0);
+      const overallUtilization = available > 0 ? (allocated / available) * 100 : 0;
+      const overCapacity = rows.filter((row) => calculateMetrics(row).status === 'Over').length;
+
+      elements.kpis.headcount.textContent = String(rows.length);
+      elements.kpis.available.textContent = formatHours(available);
+      elements.kpis.allocated.textContent = formatHours(allocated);
+      elements.kpis.utilization.textContent = formatPercent(overallUtilization);
+      elements.kpis.over.textContent = String(overCapacity);
+    }
+
+    function updateChart(rows) {
+      const source = state.chartMode === 'team' ? aggregateRowsByTeam(rows) : rows.map((row) => ({
+        label: row.name || 'Unnamed',
+        available: Number(row.available || 0),
+        allocated: Number(row.allocated || 0),
+        utilization: calculateMetrics(row).capacity
+      }));
+
+      chart.data.labels = source.map((item) => item.label);
+      chart.data.datasets = [
+        {
+          label: 'Available hours',
+          backgroundColor: '#93c5fd',
+          borderColor: '#2563eb',
+          borderWidth: 1,
+          data: source.map((item) => ({ x: item.label, y: item.available, utilization: item.utilization }))
+        },
+        {
+          label: 'Allocated hours',
+          backgroundColor: '#f59e0b',
+          borderColor: '#d97706',
+          borderWidth: 1,
+          data: source.map((item) => ({ x: item.label, y: item.allocated, utilization: item.utilization }))
+        }
+      ];
+      chart.options.scales.x = { ticks: { autoSkip: false, maxRotation: 45, minRotation: 0 } };
+      chart.update();
+    }
+
+    function aggregateRowsByTeam(rows) {
+      const grouped = new Map();
+      rows.forEach((row) => {
+        const team = row.team || 'Unassigned';
+        if (!grouped.has(team)) {
+          grouped.set(team, { label: team, available: 0, allocated: 0, utilization: 0 });
+        }
+        const entry = grouped.get(team);
+        entry.available += Number(row.available || 0);
+        entry.allocated += Number(row.allocated || 0);
+        entry.utilization = entry.available > 0 ? (entry.allocated / entry.available) * 100 : 0;
+      });
+      return [...grouped.values()].sort((a, b) => a.label.localeCompare(b.label));
+    }
+
+    function updateSortIndicators() {
+      elements.indicators.forEach((indicator) => {
+        const key = indicator.dataset.indicatorFor;
+        indicator.textContent = state.sort.key === key ? (state.sort.direction === 'asc' ? '▲' : '▼') : '';
+      });
+    }
+
+    function compareRows(left, right, key, direction) {
+      const modifier = direction === 'asc' ? 1 : -1;
+      const leftValue = getComparableValue(left, key);
+      const rightValue = getComparableValue(right, key);
+      if (typeof leftValue === 'number' && typeof rightValue === 'number') {
+        return (leftValue - rightValue) * modifier;
+      }
+      return String(leftValue).localeCompare(String(rightValue), undefined, { numeric: true, sensitivity: 'base' }) * modifier;
+    }
+
+    function getComparableValue(row, key) {
+      const metrics = calculateMetrics(row);
+      switch (key) {
+        case 'capacity': return metrics.capacity;
+        case 'status': return metrics.status;
+        case 'available': return Number(row.available || 0);
+        case 'allocated': return Number(row.allocated || 0);
+        case 'name':
+        case 'team':
+        case 'role':
+        case 'notes':
+          return row[key] || '';
+        default:
+          return row.name || '';
+      }
+    }
+
+    function calculateMetrics(row) {
+      const available = Number(row.available || 0);
+      const allocated = Number(row.allocated || 0);
+      const capacity = available > 0 ? (allocated / available) * 100 : (allocated > 0 ? 100 : 0);
+      let status = 'At capacity';
+      if (allocated > available) {
+        status = 'Over';
+      } else if (capacity < 80) {
+        status = 'Under';
+      }
+      return { capacity, status };
+    }
+
+    function parseImportedNumber(value, fallback) {
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        return fallback;
+      }
+      return parsed;
+    }
+
+    function exportCsv() {
+      const headers = ['Name', 'Team', 'Role', 'Available hours / week', 'Allocated hours / week', 'Capacity %', 'Status', 'Notes'];
+      const lines = state.rows.map((row) => {
+        const metrics = calculateMetrics(row);
+        return [
+          row.name,
+          row.team,
+          row.role,
+          row.available,
+          row.allocated,
+          metrics.capacity.toFixed(1),
+          metrics.status,
+          row.notes
+        ].map(csvEscape).join(',');
+      });
+      const csv = [headers.join(','), ...lines].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'team-capacity.csv';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+
+    async function handleImportCsv(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) {
+        return;
+      }
+      const text = await file.text();
+      const parsed = parseCsv(text);
+      if (parsed.length < 2) {
+        event.target.value = '';
+        return;
+      }
+      const headers = parsed[0].map((header) => header.trim());
+      const headerIndex = Object.fromEntries(headers.map((header, index) => [header, index]));
+      const required = ['Name', 'Team', 'Role', 'Available hours / week', 'Allocated hours / week', 'Notes'];
+      const hasRequired = required.every((header) => header in headerIndex);
+      if (!hasRequired) {
+        alert('CSV import requires the expected team capacity columns.');
+        event.target.value = '';
+        return;
+      }
+      const nextRows = parsed.slice(1)
+        .filter((row) => row.some((cell) => cell.trim() !== ''))
+        .map((row) => ({
+          id: createId(),
+          name: row[headerIndex['Name']].trim(),
+          team: row[headerIndex['Team']].trim(),
+          role: row[headerIndex['Role']].trim(),
+          available: parseImportedNumber(row[headerIndex['Available hours / week']], 40),
+          allocated: parseImportedNumber(row[headerIndex['Allocated hours / week']], 0),
+          notes: (row[headerIndex['Notes']] || '').trim()
+        }));
+
+      state.rows = nextRows.length ? nextRows : cloneSampleData();
+      persistRows();
+      render();
+      event.target.value = '';
+    }
+
+    function parseCsv(input) {
+      const rows = [];
+      let row = [];
+      let value = '';
+      let insideQuotes = false;
+      for (let index = 0; index < input.length; index += 1) {
+        const char = input[index];
+        const next = input[index + 1];
+        if (char === '"') {
+          if (insideQuotes && next === '"') {
+            value += '"';
+            index += 1;
+          } else {
+            insideQuotes = !insideQuotes;
+          }
+        } else if (char === ',' && !insideQuotes) {
+          row.push(value);
+          value = '';
+        } else if ((char === '\n' || char === '\r') && !insideQuotes) {
+          if (char === '\r' && next === '\n') {
+            index += 1;
+          }
+          row.push(value);
+          rows.push(row);
+          row = [];
+          value = '';
+        } else {
+          value += char;
+        }
+      }
+      if (value !== '' || row.length) {
+        row.push(value);
+        rows.push(row);
+      }
+      return rows;
+    }
+
+    function csvEscape(value) {
+      const text = String(value ?? '');
+      return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    }
+
+    function formatHours(value) {
+      return Number(value).toLocaleString(undefined, { maximumFractionDigits: 1 });
+    }
+
+    function formatPercent(value) {
+      return `${Number(value).toLocaleString(undefined, { maximumFractionDigits: 1 })}%`;
+    }
+
+    function persistRows() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.rows));
+    }
+
+    function loadRows() {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (!stored) {
+        return cloneSampleData();
+      }
+      try {
+        const parsed = JSON.parse(stored);
+        if (!Array.isArray(parsed) || !parsed.length) {
+          return cloneSampleData();
+        }
+        return parsed.map((row) => ({
+          id: row.id || createId(),
+          name: row.name || '',
+          team: row.team || '',
+          role: row.role || '',
+          available: Number.isFinite(Number(row.available)) ? Number(row.available) : 40,
+          allocated: Number.isFinite(Number(row.allocated)) ? Number(row.allocated) : 0,
+          notes: row.notes || ''
+        }));
+      } catch (error) {
+        return cloneSampleData();
+      }
+    }
+
+    function cloneSampleData() {
+      return SAMPLE_DATA.map((row) => ({ ...row, id: createId() }));
+    }
+
+    function createId() {
+      return `row-${Math.random().toString(36).slice(2, 10)}-${Date.now().toString(36)}`;
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+  </script>
+</body>
+</html>
